@@ -1,5 +1,5 @@
 {
-  "version": "1.0.1",
-  "url": "https://github.com/mitul002/DeskFlow-Official/releases/download/v1.0.1/DeskFlow_Setup.exe",
-  "changelog": "DeskFlow Release v1.0.1 - Added Triple-Click secret task duration editing mode."
+  "version": "1.0.3",
+  "url": "https://github.com/mitul002/DeskFlow-Official/releases/download/v1.0.3/DeskFlow_Setup.exe",
+  "changelog": "DeskFlow Release v1.0.3 - Dynamic email template signature and silent secret task duration editing."
 }
