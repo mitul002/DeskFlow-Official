@@ -1,4 +1,4 @@
-Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
+﻿Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
 
 try {
     Add-Type -TypeDefinition @"
