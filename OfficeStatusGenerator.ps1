@@ -1,4 +1,4 @@
-﻿Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
+Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
 
 try {
     Add-Type -TypeDefinition @"
@@ -2242,6 +2242,11 @@ $reader.ConformanceLevel = [System.Xml.ConformanceLevel]::Fragment
 $xmlReader = [System.Xml.XmlReader]::Create([System.IO.StringReader]$xaml)
 $window = [System.Windows.Markup.XamlReader]::Load($xmlReader)
 $global:Window = $window  # Store globally for access inside function closures/timer ticks
+
+try {
+    $iconUri = [System.Uri]::new((Join-Path $scriptDir "image\logo.ico"), [System.UriKind]::Absolute)
+    $window.Icon = [System.Windows.Media.Imaging.BitmapFrame]::Create($iconUri)
+} catch {}
 
 # Get Controls References
 $btnClose = $window.FindName("BtnClose")
@@ -6507,7 +6512,12 @@ $window.Add_Loaded({
     # Initialize System Tray Icon
     try {
         $global:NotifyIcon = New-Object System.Windows.Forms.NotifyIcon
-        $global:NotifyIcon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Get-Process -Id $PID).Path)
+        $iconPath = Join-Path $scriptDir "image\logo.ico"
+        if (Test-Path $iconPath) {
+            $global:NotifyIcon.Icon = New-Object System.Drawing.Icon($iconPath)
+        } else {
+            $global:NotifyIcon.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon((Get-Process -Id $PID).Path)
+        }
         $global:NotifyIcon.Text = "Office Status Generator"
         $global:NotifyIcon.Visible = $true
         
