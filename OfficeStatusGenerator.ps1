@@ -5495,7 +5495,7 @@ function Send-TaskUpdateEmail {
             # Entry cell: only first row, with rowspan covering all rows
             $entryCellHtml = ""
             if ($isFirstRow) {
-                $entryCellHtml = "<td rowspan='$totalRows' style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$entryTimeStr</td>"
+                $entryCellHtml = "<td rowspan='$totalRows' style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$entryTimeStr</td>"
                 $isFirstRow = $false
             }
 
@@ -5503,17 +5503,17 @@ function Send-TaskUpdateEmail {
             $projCellHtml = ""
             $pSpan = $projRowSpans[$r]
             if ($pSpan -gt 0) {
-                $projCellHtml = "<td rowspan='$pSpan' style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$proj</td>"
+                $projCellHtml = "<td rowspan='$pSpan' style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$proj</td>"
             }
             
             $rows += "
             <tr style='height:21px;'>
                 $entryCellHtml
                 $projCellHtml
-                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$details</td>
-                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$linkHtml</td>
-                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$duration</td>
-                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#4b4247;text-align:center;border:1px solid #ccc;'>$status</td>
+                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$details</td>
+                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$linkHtml</td>
+                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$duration</td>
+                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$status</td>
             </tr>"
         }
         
