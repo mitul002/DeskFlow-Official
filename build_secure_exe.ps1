@@ -46,7 +46,7 @@ namespace DeskFlowLauncher
                 {
                     ProcessStartInfo psi = new ProcessStartInfo();
                     psi.FileName = "powershell.exe";
-                    psi.Arguments = $"-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"{scriptPath}\"";
+                    psi.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File \"" + scriptPath + "\"";
                     psi.CreateNoWindow = true;
                     psi.UseShellExecute = false;
                     
