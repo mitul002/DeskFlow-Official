@@ -1,4 +1,4 @@
 @echo off
 cd /d "%~dp0"
-wscript "%~dp0Launch.vbs"
+start "" powershell.exe -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0OfficeStatusGenerator.ps1"
 exit
