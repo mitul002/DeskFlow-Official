@@ -4406,13 +4406,30 @@ function Get-TaskUpdateText {
     $lines = @()
     foreach ($task in $global:TaskList) {
         $projPart = if ([string]::IsNullOrWhiteSpace($task.Project)) { "" } else { "[" + $task.Project.Trim() + "] " }
-        $detailsPart = $task.Details.Trim()
+        $detailsPart = if ($null -ne $task.Details) { $task.Details.Trim() } else { "" }
         $linkPart = if ([string]::IsNullOrWhiteSpace($task.Link)) { "" } else { " (" + $task.Link.Trim() + ")" }
         $statusPart = " - " + $task.Status
         $durationPart = " (" + $task.Duration + ")"
         
         if (-not [string]::IsNullOrWhiteSpace($detailsPart)) {
-            $lines += "- $projPart$detailsPart$linkPart$statusPart$durationPart"
+            $subLines = $detailsPart -split "\r?\n"
+            if ($subLines.Count -gt 1) {
+                $formattedSub = @()
+                for ($si = 0; $si -lt $subLines.Count; $si++) {
+                    $sLine = $subLines[$si]
+                    if ($si -eq 0) {
+                        $formattedSub += $sLine.Trim()
+                    } else {
+                        if (-not [string]::IsNullOrWhiteSpace($sLine)) {
+                            $formattedSub += "  " + $sLine.Trim()
+                        }
+                    }
+                }
+                $joinedDetails = $formattedSub -join "`n"
+                $lines += "- $projPart$joinedDetails$linkPart$statusPart$durationPart"
+            } else {
+                $lines += "- $projPart$detailsPart$linkPart$statusPart$durationPart"
+            }
         }
     }
     return $lines -join "`n"
@@ -4439,7 +4456,7 @@ function Add-TaskRow {
     $rowXaml = @"
 <Grid xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
       xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-      Margin="0,0,0,8" Height="30">
+      Margin="0,0,0,8" MinHeight="30">
     <Grid.ColumnDefinitions>
         <ColumnDefinition Width="105"/> <!-- Actions -->
         <ColumnDefinition Width="6"/>
@@ -4456,7 +4473,7 @@ function Add-TaskRow {
         <ColumnDefinition Width="80"/>  <!-- Synced Badge -->
     </Grid.ColumnDefinitions>
     
-    <Grid Grid.Column="0">
+    <Grid Grid.Column="0" VerticalAlignment="Top" Margin="0,1,0,0">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="30"/>
             <ColumnDefinition Width="35"/>
@@ -4468,19 +4485,19 @@ function Add-TaskRow {
         <Button Name="BtnDelete" Grid.Column="3" Content="🗑" FontSize="12" Height="28" Background="#D63031" Foreground="White" BorderThickness="0" Cursor="Hand"/>
     </Grid>
     
-    <TextBox Name="TxtProject" Grid.Column="2" Style="{DynamicResource ModernTextBox}" Height="30" Tag="Project..."/>
-    <TextBox Name="TxtDetails" Grid.Column="4" Style="{DynamicResource ModernTextBox}" Height="30" Tag="Task Details..."/>
-    <TextBox Name="TxtLink" Grid.Column="6" Style="{DynamicResource ModernTextBox}" Height="30" Tag="Link/URL..."/>
+    <TextBox Name="TxtProject" Grid.Column="2" Style="{DynamicResource ModernTextBox}" Height="30" VerticalAlignment="Top" Tag="Project..."/>
+    <TextBox Name="TxtDetails" Grid.Column="4" Style="{DynamicResource ModernTextBox}" MinHeight="30" MaxHeight="120" AcceptsReturn="True" TextWrapping="Wrap" VerticalScrollBarVisibility="Auto" VerticalContentAlignment="Top" Padding="8,5" Tag="Task Details..."/>
+    <TextBox Name="TxtLink" Grid.Column="6" Style="{DynamicResource ModernTextBox}" Height="30" VerticalAlignment="Top" Tag="Link/URL..."/>
     
-    <ComboBox Name="CmbStatus" Grid.Column="8" Height="30" Background="#1E1E26" Foreground="Black" FontWeight="Bold" BorderBrush="#2D2D37" BorderThickness="1" VerticalContentAlignment="Center">
+    <ComboBox Name="CmbStatus" Grid.Column="8" Height="30" VerticalAlignment="Top" Background="#1E1E26" Foreground="Black" FontWeight="Bold" BorderBrush="#2D2D37" BorderThickness="1" VerticalContentAlignment="Center">
         <ComboBoxItem Content="In Progress"/>
         <ComboBoxItem Content="Complete"/>
         <ComboBoxItem Content="Waiting for confirmation"/>
     </ComboBox>
     
-    <TextBox Name="TxtDuration" Grid.Column="10" Text="00:00:00" Foreground="White" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" Background="Transparent" BorderThickness="0" IsReadOnly="True" Cursor="Hand" Padding="4,2"/>
+    <TextBox Name="TxtDuration" Grid.Column="10" Text="00:00:00" Height="30" Foreground="White" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Top" HorizontalAlignment="Center" Background="Transparent" BorderThickness="0" IsReadOnly="True" Cursor="Hand" Padding="4,6"/>
     
-    <Border Name="BorderSynced" Grid.Column="12" CornerRadius="4" Background="#2D2D37" Height="22" VerticalAlignment="Center" HorizontalAlignment="Center" Padding="8,2">
+    <Border Name="BorderSynced" Grid.Column="12" CornerRadius="4" Background="#2D2D37" Height="22" VerticalAlignment="Top" Margin="0,4,0,0" HorizontalAlignment="Center" Padding="8,2">
         <TextBlock Name="TxtSyncedStatus" Text="Pending" Foreground="#B0B0C0" FontSize="10" FontWeight="Bold" VerticalAlignment="Center"/>
     </Border>
 </Grid>
@@ -4614,6 +4631,13 @@ function Add-TaskRow {
     
     $txtDetails.Add_GotFocus({
         $global:LastFocusedDetailsTextBox = $this
+    })
+    
+    $txtDetails.Add_TextChanged({
+        $task = $this.Tag
+        if ($null -ne $task) {
+            $task.Details = $this.Text
+        }
     })
     
     $txtProject.Add_LostFocus({
@@ -5506,11 +5530,13 @@ function Send-TaskUpdateEmail {
                 $projCellHtml = "<td rowspan='$pSpan' style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$proj</td>"
             }
             
+            $detailsHtml = if ([string]::IsNullOrWhiteSpace($details)) { "" } else { [System.Net.WebUtility]::HtmlEncode($details) -replace '\r?\n', '<br/>' }
+            
             $rows += "
-            <tr style='height:21px;'>
+            <tr style='min-height:21px;'>
                 $entryCellHtml
                 $projCellHtml
-                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$details</td>
+                <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$detailsHtml</td>
                 <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$linkHtml</td>
                 <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$duration</td>
                 <td style='overflow:hidden;padding:2px 3px;vertical-align:middle;background-color:$tableBodyColor;font-family:Montserrat, Arial, sans-serif;font-size:10pt;color:#333333;text-align:center;border:1px solid #ccc;'>$status</td>
