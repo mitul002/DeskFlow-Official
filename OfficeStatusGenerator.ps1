@@ -1,4 +1,4 @@
-﻿Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
+Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml, System.Runtime.WindowsRuntime, System.Windows.Forms, System.Drawing
 
 try {
     Add-Type -TypeDefinition @"
@@ -2519,6 +2519,7 @@ if ($null -ne $txtEntryTime) {
                 $ctrl.Text = $formattedStr
                 
                 try { Update-TaskUpdatePreview } catch {}
+                Sync-EntryTime
                 Show-Toast "✅ Entry time updated to $formattedStr" "#0984E3" "#0B4F8A"
             } else {
                 if ($null -ne $global:EntryTime) {
@@ -4313,10 +4314,14 @@ function Sync-TaskRow {
         Stop-Job -Job $existingJob -ErrorAction SilentlyContinue
         Remove-Job -Job $existingJob -Force -ErrorAction SilentlyContinue
     }
+
+    # Projects of ALL task rows (in order) so the sheet can repair/merge project cells
+    $projList = @($global:TaskList | ForEach-Object { if ($null -eq $_.Project) { "" } else { ([string]$_.Project).Trim() } })
     
-    Start-Job -Name $jobName -ArgumentList $scriptUrl, $global:Settings.user_name, $global:Settings.user_role, $TaskObj.Project, $TaskObj.Details, $TaskObj.Link, $TaskObj.Status, $TaskObj.Duration, $entryTimeStr, $taskIdx, $Action -ScriptBlock {
-        param($url, $user, $role, $project, $details, $link, $status, $duration, $entryTime, $taskIndex, $actionType)
+    Start-Job -Name $jobName -ArgumentList $scriptUrl, $global:Settings.user_name, $global:Settings.user_role, $TaskObj.Project, $TaskObj.Details, $TaskObj.Link, $TaskObj.Status, $TaskObj.Duration, $entryTimeStr, $taskIdx, $Action, $projList -ScriptBlock {
+        param($url, $user, $role, $project, $details, $link, $status, $duration, $entryTime, $taskIndex, $actionType, $projectsList)
         
+        [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
         $today = (Get-Date).ToString("d MMMM")
         $timeStr = (Get-Date).ToString("hh:mm:ss tt")
         
@@ -4333,6 +4338,7 @@ function Sync-TaskRow {
             time = $timeStr
             task_index = $taskIndex
             action = $actionType
+            projects = @($projectsList)
         } | ConvertTo-Json -Depth 5
         
         try {
@@ -4373,21 +4379,74 @@ function Sync-TaskRow {
                     $textBlock.Text = "Failed"
                     $textBlock.Foreground = [System.Windows.Media.BrushConverter]::new().ConvertFromString("#FFFFFF")
                     
-                    # Check for 401 and alert user nicely
+                    # Check for errors and alert user nicely via toast notifications
                     $errMsg = if ($null -ne $resultObj) { $resultObj.Error } else { "Unknown error" }
                     if ($errMsg -like "*401*") {
                         Show-Toast "⚠ 401 Unauthorized: Please set 'Who has access: Anyone' in Apps Script!" "#FF4D4D" "#8B0000"
+                    } elseif ($errMsg -like "*404*") {
+                        Show-Toast "⚠ 404 Not Found: Please redeploy Apps Script as 'Web app'!" "#FF4D4D" "#8B0000"
                     } else {
-                        Write-Warning "Sync failed: $errMsg"
+                        Show-Toast "⚠ Sync failed: $errMsg" "#FF4D4D" "#8B0000"
                     }
                 }
             }
         } catch {
-            Write-Warning "Error in Sync check tick: $_"
+            Write-Debug "Error in Sync check tick: $_"
         }
     }.GetNewClosure())
     $timer.Start()
     return $true
+}
+
+# Create a row in the Google Sheet (inside the user's block) as soon as "Add Task Row" is clicked
+function Sync-AddRow {
+    $scriptUrl = $global:Settings.google_script_url
+    if ([string]::IsNullOrWhiteSpace($scriptUrl)) { return }
+
+    # Clean up finished AddRow jobs only (do NOT touch SyncTask_* jobs, the sync timer reads those)
+    Get-Job -Name "AddRow_*" -ErrorAction SilentlyContinue | Where-Object { $_.State -eq "Completed" } | Remove-Job -Force -ErrorAction SilentlyContinue
+
+    $idx = $global:TaskList.Count
+    $entryTimeStr = ""
+    if ($null -ne $global:EntryTime) { $entryTimeStr = $global:EntryTime.ToString("hh:mm tt") }
+
+    Start-Job -Name ("AddRow_" + [Guid]::NewGuid().ToString("N")) `
+        -ArgumentList $scriptUrl, $global:Settings.user_name, $global:Settings.user_role, $idx, $entryTimeStr `
+        -ScriptBlock {
+            param($url, $user, $role, $taskIndex, $entryTime)
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $body = @{
+                date       = (Get-Date).ToString("d MMMM")
+                name       = $user
+                role       = $role
+                entry      = $entryTime
+                task_index = $taskIndex
+                action     = "addrow"
+            } | ConvertTo-Json
+            try { Invoke-RestMethod -Uri $url -Method Post -Body $body -ContentType "application/json" -TimeoutSec 45 } catch {}
+        } | Out-Null
+}
+
+function Sync-EntryTime {
+    $scriptUrl = $global:Settings.google_script_url
+    if ([string]::IsNullOrWhiteSpace($scriptUrl) -or $null -eq $global:EntryTime) { return }
+
+    Get-Job -Name "EntrySync_*" -ErrorAction SilentlyContinue | Where-Object { $_.State -eq "Completed" } | Remove-Job -Force -ErrorAction SilentlyContinue
+
+    Start-Job -Name ("EntrySync_" + [Guid]::NewGuid().ToString("N")) `
+        -ArgumentList $scriptUrl, $global:Settings.user_name, $global:Settings.user_role, $global:EntryTime.ToString("hh:mm tt") `
+        -ScriptBlock {
+            param($url, $user, $role, $entryTime)
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+            $body = @{
+                date       = (Get-Date).ToString("d MMMM")
+                name       = $user
+                role       = $role
+                entry      = $entryTime
+                task_index = 1
+            } | ConvertTo-Json
+            try { Invoke-RestMethod -Uri $url -Method Post -Body $body -ContentType "application/json" -TimeoutSec 45 } catch {}
+        } | Out-Null
 }
 
 # Update visual row index indicators
@@ -4746,6 +4805,7 @@ function Add-TaskRow {
     
     Update-TaskIndices
     Update-TaskUpdatePreview
+    Sync-AddRow
 }
 
 # 7. Navigation Tabs Loading Views
